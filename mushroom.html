@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+
+<head>
+
+<title>Mushroom</title>
+
+<script src="./../mrdoob-threejs/build/three.min.js"></script>
+<script src="./../cs291-master/lib/Coordinates.js"></script>
+<script src="./../cs291-master/lib/OrbitAndPanControls.new.js"></script>
+<script src="./../cs291-master/lib/dat.gui.min.js"></script>
+<script src="./../tween.js-master/build/tween.min.js"></script>
+<script src="./js/mushroom.js"></script>
+<script src="./js/butterfly.js"></script>
+<script src="./js/tubeTry.js"></script>
+
+
+
+<style type="text/css">
+	.c1 {
+		width: 800px;
+		height: 600px;
+	}
+	
+	
+	#container{
+		width: 810px;
+		height: 610px;
+		border: 1px solid #000;
+	}
+</style>
+
+</head>
+<body>
+
+
+<div id="container">
+<canvas class="c1">
+</canvas>
+</div>
+
+<script type="text/javascript">
+/*global THREE, Coordinates, document, window, dat*/
+
+var camera, scene, renderer, projector;
+var cameraControls, effectController;
+
+var clock = new THREE.Clock();
+var rSeg = 32;
+var hSeg = 8;
+
+var showSpotCam = false;	
+var isDaytime = true;
+var animateWater = true;
+var closeView = false;
+
+var bubbleCount = 50;
+var bubblePartSys;
+var bubbleTextureDay, bubbleTextureNight;
+
+var canvasWidth =  800;
+var canvasHeight = 600;
+var objects = [];			//list of mesh  in the scene that check for onmousedown
+
+
+var daylight, nightlight;
+var riverMat;				//made global so can access for animation in render func
+
+var wireMaterial = new THREE.MeshBasicMaterial({color: 0x009900, wireframe: true, transparent: true});
+
+var wireObjs = [];
+var mushroomList = [];		//list of Mushroom objects (mushroom.js)
+var smallMushrooms = [];
+
+var moon;
+var bfly1;
+
+function drawSkyObjects() {
+	var moonGeo = new THREE.SphereGeometry(100, rSeg, rSeg);
+	var moonMat = new THREE.MeshBasicMaterial({color: 0x5577ff, transparent:true});
+	
+	moon = new THREE.Mesh(moonGeo, moonMat);
+	//moon.position.set (100, 500, -500);
+	moon.position.set(200, 500, -700)
+	
+	if (isDaytime) {
+		moon.position.set (100, 0, -500);
+		moon.material.opacity = 0.0;	
+	}
+	
+	scene.add(moon);
+	
+	
+}
+
+function createBubbles(rWidth) {
+	
+	bubbleTextureDay = THREE.ImageUtils.loadTexture("./img/bubble.png");
+	bubbleTextureNight = THREE.ImageUtils.loadTexture("./img/bubble2.png");
+	
+	var bTexture = bubbleTextureDay;
+	if (!isDaytime) {
+		bTexture = bubbleTextureNight;
+	}
+
+	var bMat = new THREE.ParticleBasicMaterial({
+		color:0xffffff,
+		size: 50, sizeAttenuation: false, map: bTexture,
+		transparent: true, opacity: 0.7});
+		
+	var geo = new THREE.Geometry();
+	for (var i = 0; i < bubbleCount; i++) {
+		var v = new THREE.Vector3();
+		v.x = (rWidth + 10) * Math.random() - rWidth / 2;
+		v.y = 25 * Math.random();		
+		v.z = 50 * Math.random() -25;
+		geo.vertices.push(v);
+	}
+	
+	bubblePartSys = new THREE.ParticleSystem(geo, bMat);	
+	bubblePartSys.sortParticles = true;
+	
+}
+
+
+function drawWaterFall() {
+	var waterFall = new THREE.Object3D();
+	
+	var rWidth = 100;
+	var rHeight = 200;
+	
+	var riverGeo = new THREE.PlaneGeometry(rWidth, rHeight);
+	var riverTexture = THREE.ImageUtils.loadTexture('./img/water.png');
+	riverTexture.wrapS = riverTexture.wrapT = THREE.RepeatWrapping;
+	riverTexture.repeat.set(3, 2);
+	
+	riverMat = new THREE.MeshLambertMaterial({map: riverTexture, side: THREE.DoubleSide});
+	
+	var riverVert = new THREE.Mesh(riverGeo, riverMat);
+	waterFall.add(riverVert);
+	
+	var wallWidth = 20;
+	var wallGeo1 = new THREE.CubeGeometry(wallWidth, rHeight, 10);
+	var wallMat = new THREE.MeshLambertMaterial({color: 0x666666});
+	var wallA = new THREE.Mesh(wallGeo1, wallMat);
+	var wallB = new THREE.Mesh(wallGeo1, wallMat);
+	
+	wallOffsetX= (rWidth + wallWidth) / 2;
+	wallA.position.x = -1 * wallOffsetX;
+	wallB.position.x = wallOffsetX;
+	
+	waterFall.add(wallA);
+	waterFall.add(wallB);	
+	waterFall.position.y = rHeight / 2;
+	
+	//pool area
+	var poolHeight = 5;
+	var poolR = rWidth/2 + wallWidth;
+	var poolGeo = new THREE.CylinderGeometry(poolR, poolR, poolHeight, rSeg, hSeg, false);
+	var poolMat = new THREE.MeshLambertMaterial({color: 0x269EFB, transparent:true, opacity: 0.8});
+	
+	var pool = new THREE.Mesh(poolGeo, poolMat);
+	
+	var poolWallW = 5;
+	var poolWallGeo = new Tube(poolR + poolWallW, poolR + poolWallW,
+		poolR, poolR, poolHeight + 3, rSeg, 2, true, true);
+	
+	//var poolWallMat = new THREE.MeshLambertMaterial({color: 0x777777});
+	var poolWall = new THREE.Mesh(poolWallGeo, wallMat);
+	
+	var pond = new THREE.Object3D();
+	pond.add(pool);
+	pond.add(poolWall);	
+	pond.scale.z = 2.0;
+	
+	createBubbles(rWidth);
+	
+	var tmpParent = new THREE.Object3D();
+	tmpParent.add(waterFall);
+	tmpParent.add(pond);
+	tmpParent.add(bubblePartSys);
+
+	tmpParent.position.set(220, 0, -100);
+	
+	scene.add(tmpParent);
+}
+
+function drawBackground() {
+
+	var gHeight= 30;
+	var gWidth = 1000;
+	var gDepth = 800;
+		
+	var grassTexture = THREE.ImageUtils.loadTexture( './img/grassChecker.png' );		
+	var grassMat = new THREE.MeshLambertMaterial({map: grassTexture, color:0xffffff, side: THREE.DoubleSide});
+
+	//inorder to repeat must be power of 2
+	grassTexture.wrapS = grassTexture.wrapT = THREE.RepeatWrapping;
+	grassTexture.repeat.set(10, 10 / (gWidth / gDepth));
+	
+	var dirtTexture = THREE.ImageUtils.loadTexture('./img/brownChecker.png');
+	dirtTexture.wrapS = dirtTexture.wrapT = THREE.RepeatWrapping;
+	dirtTexture.repeat.set(10, 10 / (gWidth / gDepth));
+	
+	var dirtMat1 = new THREE.MeshBasicMaterial({color: 0x996600});
+	var dirtMat2 = new THREE.MeshLambertMaterial({map: dirtTexture});
+	
+	var dirtTexture 
+	var materials = [
+		dirtMat1,
+		dirtMat1,
+		grassMat,
+		dirtMat2,
+		dirtMat1,
+		dirtMat1
+	];	
+	
+	var groundGeo = new THREE.CubeGeometry(gWidth,gHeight, gDepth, 1, 1, 1);
+	var ground= new THREE.Mesh(groundGeo, new THREE.MeshFaceMaterial(materials));	
+	
+	ground.id = "ground";	
+	ground.position.y = - gHeight / 2 - 1;
+	
+	ground.castShadow = false;
+	ground.receiveShadow = true;
+		
+	scene.add(ground);
+	
+
+	drawWaterFall();
+	drawSkyObjects();
+	//objects.push(ground);	
+}
+
+function drawMushroom () {
+	
+	var m1 = new Mushroom(40, 30, 10,15, 2, 3);
+	var m2 = new Mushroom(50, 70,10,20, 0.5, -3);
+	var m3 = new Mushroom(45, 30, 17, 25, 1, 0);
+	
+	m1.setColors("0xffba00", "0xbbba00", "0xffba00");
+	m1.setTextures("./img/cap1.png", "./img/ucap1.png", "./img/stalk1.png");
+	
+	m2.setTextures("./img/cap2.png", "./img/ucap2.png", "./img/stalk2.png");
+	
+	m3.setColors("0xFFCC44", "0xffffff", "0xdd9900");
+	m3.setTextures("./img/cap3.png", "./img/ucap3.png", "./img/stalk3.png");
+		
+	m1.growIt();
+	m2.growIt();
+	m3.growIt();
+	
+	m1.model.id = "m1";
+	m1.model.children[0].id = "cap1";
+	m1.model.children[1].id = "ucap1";	
+	m1.model.children[2].id = "stalk1";	
+	m1.model.children[2].material.map.wrapT = THREE.RepeatWrapping;
+	m1.model.children[0].material.map.wrapS = THREE.RepeatWrapping;
+	m1.model.children[0].material.map.repeat.set(3,1);		
+	
+	m1.model.position.x = -100;
+	
+	m2.model.id = "m2";
+	m2.model.children[0].id = "cap2";
+	m2.model.children[1].id = "ucap2";	
+	m2.model.children[2].id = "stalk2";	
+	//m2.model.children[2].material.color.setHex("0x75d6fb");
+	//var capTexture1 = THREE.ImageUtils.loadTexture( './img/stalk2.png' );		
+	//m2.model.children[2].material.map = capTexture1;	
+	m2.model.children[2].material.map.wrapT = THREE.RepeatWrapping;
+	m2.model.children[2].material.map.repeat.set(1, 4);
+	//m2.model.rotation.z = 15 * Math.PI / 180;
+		
+	
+	m3.model.children[0].id = "cap3";
+	m3.model.children[1].id = "ucap3";	
+	m3.model.children[2].id = "stalk3";	
+	m3.model.children[0].material.map.wrapS = THREE.MirroredRepeatWrapping;
+	m3.model.children[0].material.map.repeat.set(6,1);		
+	m3.model.children[2].material.map.wrapS = THREE.RepeatWrapping;
+	m3.model.children[2].material.map.repeat.set(10,1);	
+	m3.model.position.x = 100;
+		
+	var shroomGroup = new THREE.Object3D();
+	shroomGroup.add(m1.model);
+	shroomGroup.add(m2.model);
+	shroomGroup.add(m3.model);
+	
+	shroomGroup.position.set(-50, 0, -10);
+	
+	scene.add(shroomGroup);
+	
+	//push onto array so can detect intersect when click (cap, undercap, stalk)
+	objects.push(m1.model.children[0]);	//cap
+	objects.push(m2.model.children[0]);	//undercap
+	objects.push(m3.model.children[0]);	//stalk
+	
+	objects.push(m1.model.children[1]);
+	objects.push(m2.model.children[1]);
+	objects.push(m3.model.children[1]);
+	
+	objects.push(m1.model.children[2]);
+	objects.push(m2.model.children[2]);
+	objects.push(m3.model.children[2]);
+		
+	mushroomList.push(m1);
+	mushroomList.push(m2);
+	mushroomList.push(m3);
+	
+	for (var i = 0; i < 3; i++) {
+		mushroomList[i].model.traverse(function (object) {
+			if (object instanceof THREE.Mesh) {
+				object.castShadow = true;
+				//object.receiveShadow = true;
+			}
+		});		
+	}
+	
+}
+
+function drawButterfly() {
+
+	bfly1 = new Butterfly("0x00dd55", "0xffff00", "./img/wing.png");	
+	bfly1.createButterfly();	
+	bfly1.model.scale.set(3,3,3);
+	bfly1.model.rotation.x = 40 * Math.PI / 180;	
+	bfly1.model.position.set (-210, 120, -10);
+	scene.add(bfly1.model);	
+	bfly1.flapWings();
+}
+
+
+
+// Mostly grabbed from http://mrdoob.github.com/three.js/examples/canvas_interactive_cubes.html
+// Author unknown.
+function onDocumentMouseDown( event ) {
+
+	//console.log("objects.length:" + objects.length);
+	//event.preventDefault();
+
+	// Annoying nested window code: need to subtract offsets for nested windows.
+	// This is not needed if you have just a single window filling the browser
+	// var node = event.srcElement;
+	// var mouseX = event.clientX - node.offsetLeft;
+	// var mouseY = event.clientY - node.offsetTop;
+
+
+	// getBoundingClientRect()
+	//   givest the element's position relative to the browser's visile viewport.
+	// clientX/Y
+	//   gives the mouse position relative to the browser's visible viewport.
+	//
+	// we then just have to find the difference between the two
+	// to get the mouse position in "canvas-space"
+	var canvasPosition = renderer.domElement.getBoundingClientRect();
+	var mouseX = event.clientX - canvasPosition.left;
+	var mouseY = event.clientY - canvasPosition.top;
+
+	// console.log(canvasPosition.left,canvasPosition.top);
+	// console.log(mouseX,mouseY);
+
+	/*
+	while (node.offsetParent){
+		node = node.offsetParent;
+		mouseX -= node.offsetLeft;
+		mouseY -= node.offsetTop;
+	}*/
+
+	/* the old way */
+	/*
+	var mouseVector = new THREE.Vector3(
+		2 * ( mouseX / canvasWidth ) - 1,
+		1 - 2 * ( mouseY / canvasHeight ), 0.5 );
+	projector.unprojectVector( mouseVector, camera );
+
+	var raycaster = new THREE.Raycaster( camera.position, mouseVector.sub( camera.position ).normalize() );
+	*/
+
+	/* the new way: simpler creation of raycaster */
+	/* from tutorial: http://soledadpenades.com/articles/three-js-tutorials/object-picking/ */
+	var mouseVector = new THREE.Vector3(
+		2 * ( mouseX / canvasWidth ) - 1,
+		1 - 2 * ( mouseY / canvasHeight ));
+		
+	// debug: console.log( "client Y " + event.clientY + ", mouse Y " + mouseY );
+
+	var raycaster = projector.pickingRay( mouseVector.clone(), camera );
+	var intersects = raycaster.intersectObjects( objects );
+
+	if ( intersects.length > 0 ) {
+
+		//intersects[ 0 ].object.material.color.setRGB( Math.random(), Math.random(), Math.random() );
+		var id = intersects[0].object.id;
+		//console.log("intersects:" + id);
+		if (id == "cap1" || id == "ucap1"  || id == "stalk1") {
+			mushroomAction1();
+		} else if (id == "cap2" || id == "ucap2"  || id == "stalk2") {
+			mushroomAction2();
+		} else if (id == "cap3" || id == "ucap3"  || id == "stalk3") {
+			mushroomAction3();
+		}
+		
+	
+	
+		/*var sphereGeom = new THREE.SphereGeometry(10);
+		var sphereMaterial = new THREE.MeshBasicMaterial({color: 0xdddddd});
+		
+		var sphere = new THREE.Mesh( sphereGeom, sphereMaterial );
+		sphere.position = intersects[ 0 ].point;
+		scene.add( sphere );
+		*/
+	}
+
+	/*
+	// Parse all the faces, for when you are using face materials
+	for ( var i in intersects ) {
+		intersects[ i ].face.material[ 0 ].color.setHex( Math.random() * 0xFFFFFF | 0x80000000 );
+	}
+	*/
+}
+
+
+//switch from night to day
+function mushroomAction1() {
+	var shroom = mushroomList[0];
+	shroom.spin();
+	
+	isDaytime = !isDaytime;	
+	updateTimeOfDay();
+	effectController.isDaytime = isDaytime;		
+}
+
+function mushroomAction2() {
+	var shroom = mushroomList[1];
+	shroom.pushButton();
+	
+	closeView = !closeView;
+	
+	
+	//do a camera rotation
+	var origPos = new THREE.Vector3();
+	var origLook = new THREE.Vector3();
+	
+	
+	origPos.copy(camera.position);
+	origLook.copy(cameraControls.target);
+	
+	//console.log("origPos: " + origPos.x +  ", "  + origPos.y + "," + origPos.z);
+	
+	var startPos1 = {x1: origPos.x, y1: origPos.y, z1:origPos.z,
+		x2: origLook.x, y2: origLook.y, z2: origLook.z};
+
+	var endPos1;
+	if (closeView) {
+		endPos1 = {x1: -110, y1:147, z1:485, x2:-7, y2:90, z2: 67}
+	} else {
+		endPos1 = {x1: -290, y1:570, z1:1400, x2:60, y2:195, z2: -47}
+	}
+		
+	var tween0 = new TWEEN.Tween(startPos1).to(endPos1, 1000);
+	tween0.easing(TWEEN.Easing.Linear.None);
+	tween0.onUpdate(function() {
+		camera.position.x = startPos1.x1;
+		camera.position.y = startPos1.y1;
+		camera.position.z = startPos1.z1;
+		
+		cameraControls.target.x = startPos1.x2;
+		cameraControls.target.y = startPos1.y2;
+		cameraControls.target.z = startPos1.z2;
+	});
+	
+	tween0.delay(500);
+	tween0.start();
+
+		
+	//console.log("newPos: " + camera.position.x +  ", "  + camera.position.y + "," + camera.position.z);
+	
+}
+
+function mushroomAction3() {
+	var shroom = mushroomList[2];
+	shroom.jiggle();
+	
+	//add new mushrooms
+	var capSize = 10 + (Math.random() * 10);
+	var stalkHeight = 10 + (Math.random() * 5);
+	var stalkTop = capSize - 5 - (Math.random() * 5);
+	var stalkBottom = stalkTop + (Math.random() * 5);
+	var capScaleY = Math.random() * 2 + 1;
+	
+	var m = new Mushroom (capSize, stalkHeight, stalkTop, stalkBottom, capScaleY);
+	
+	var capColors = ["0xeeeeee", "0xffba00", "0xD32416", "0xdd9900", "0xdddd00"];
+	var capTextures = ["./img/cap1.png", "./img/cap2.png", "./img/cap3.png"];
+	
+	var rnd1 = Math.floor(Math.random()*5);
+	var rnd2 = Math.floor(Math.random()*3);
+	
+	var mColor = capColors[rnd1];
+		
+	m.setColors(mColor, mColor, mColor);
+	m.capTexture = capTextures[rnd2];
+	m.growIt();
+	
+	m.model.traverse(function(obj) {
+		if (obj instanceof THREE.Mesh) {
+			obj.castShadow = true;
+		}
+	});
+	
+	var xpos = Math.random() * 800 - 400;
+	var ypos = stalkHeight / 2;
+	var zpos = Math.random() * 200 + 120;
+	
+	m.model.position.set(xpos, ypos, zpos);
+	
+	//console.log("baby mushroom is born! at:" +  xpos + ", " + ypos + "," + zpos)
+	
+	smallMushrooms.push(m);
+	
+	scene.add(m.model);
+		
+}
+
+
+
+function updateTimeOfDay() {
+	//change the lighting
+		
+	daylight.traverse(function (obj) {
+		obj.visible = isDaytime;
+		if (obj instanceof THREE.SpotLight) {			
+			obj.castShadow = isDaytime;
+		}
+	});
+		
+	nightlight.traverse(function (obj) {
+		obj.visible = !isDaytime;
+		if (obj instanceof THREE.SpotLight) {
+			obj.castShadow = !isDaytime;
+		}
+	});	
+	
+	if (isDaytime) {
+		renderer.setClearColor( 0xDDEEFF, 1.0 );
+		bubblePartSys.material.map = bubbleTextureDay;				
+		hideMoon();
+	} else {
+		renderer.setClearColor( 0x000066, 1.0 );
+		bubblePartSys.material.map = bubbleTextureNight;
+		displayMoon();
+	}
+	
+}
+
+
+function hideMoon() {
+	//animate the moon opacity to be invisible 
+	
+	var curr = {scale: 1.0, opacity: 1.0};
+	var end = {scale: 0.1, opacity: 0.0};
+	var tween0 = new TWEEN.Tween(curr).to(end, 500);
+	tween0.easing(TWEEN.Easing.Quartic.In);
+	tween0.onUpdate(function() {
+		moon.material.opacity = curr.opacity;
+	});
+			
+	
+	tween0.start();
+}
+
+function displayMoon() {
+	//animate the moon opacity to be visible 
+	//move the mooon up to the sky
+	moon.position.set (100, 0, -500);
+		
+	var opacity = {val: 0.0};
+	var opacityTarget = {val: 1.0};
+	var tween0 = new TWEEN.Tween(opacity).to(opacityTarget, 800);
+	tween0.easing(TWEEN.Easing.Cubic.In);
+	tween0.onUpdate(function() {
+		moon.material.opacity = opacity.val;
+	});
+			
+	var position = { x : 100, y: 0};
+	var target = { x : 100, y: 500};
+						
+	var tween1 = new TWEEN.Tween(position).to(target, 1500);
+	tween1.easing(TWEEN.Easing.Bounce.In);
+	tween1.onUpdate(function(){
+		moon.position.x = position.x;
+		moon.position.y = position.y;
+	});
+			
+	tween0.delay(500);
+	tween0.chain(tween1);
+	tween0.start();
+	
+
+}
+
+
+function harvestSmallMushrooms() {
+	//loop through smallMushrooms
+	//console.log("harvest:" + smallMushrooms.length);
+	for (var i = smallMushrooms.length - 1; i >= 0; i--) {		
+		scene.remove(smallMushrooms[i].model);		
+	}	
+	smallMushrooms = [];
+}
+
+
+function init() {
+	var canvasRatio = canvasWidth / canvasHeight;
+
+	// RENDERER
+	renderer = new THREE.WebGLRenderer( { antialias: false } );
+	renderer.gammaInput = true;
+	renderer.gammaOutput = true;
+	renderer.setSize(canvasWidth, canvasHeight);
+	
+	if (isDaytime) {
+		renderer.setClearColor( 0xDDEEFF, 1.0 );
+	} else {
+		renderer.setClearColor( 0x000066, 1.0 );
+	}
+	
+	
+	renderer.shadowMapEnabled = true;
+	
+	
+	// CAMERA
+	var viewAngle = 45;
+	var near = 0.1;
+	var far = 20000;
+	camera = new THREE.PerspectiveCamera( viewAngle, canvasRatio, near, far);
+	
+	// CONTROLS
+	cameraControls = new THREE.OrbitAndPanControls(camera, renderer.domElement);
+	camera.position.set(105,418,890);
+	cameraControls.target.set(21,191,-23);
+	
+	projector = new THREE.Projector();
+	document.addEventListener( 'mousedown', onDocumentMouseDown, false );
+	
+}
+
+
+
+function setupGui() {
+	
+	effectController = {
+		showSpotCam : showSpotCam,
+		isDaytime: isDaytime,
+		animateWater: animateWater,
+		harvest: false,
+		camPosX: camera.position.x,
+		camPosY: camera.position.y,
+		camPosZ: camera.position.z,
+		camLookX: cameraControls.target.x,
+		camLookY: cameraControls.target.y,
+		camLookZ: cameraControls.target.z
+		
+	}
+	 
+	var gui = new dat.GUI();
+	var f1 = gui.addFolder("Display");
+	var f2 = gui.addFolder("Camera Info:");
+	
+	var timeOfDayControl = f1.add(effectController, "isDaytime").name("Daytime").listen();
+	var waterControl = f1.add(effectController, "animateWater").name("Water Flow").listen();
+	var harvestControl = f1.add(effectController, "harvest").name("Harvest").listen();
+	
+	f2.add(effectController, 'camPosX').listen();
+	f2.add(effectController, 'camPosY').listen();
+	f2.add(effectController, 'camPosZ').listen();
+	f2.add(effectController, 'camLookX').listen();
+	f2.add(effectController, 'camLookY').listen();
+	f2.add(effectController, 'camLookZ').listen();
+		
+	timeOfDayControl.onChange(function (value) {		
+		isDaytime = effectController.isDaytime;
+		updateTimeOfDay();		
+		
+	});
+	
+	waterControl.onChange(function(value) {
+		animateWater = effectController.animateWater;
+		
+	});
+	
+	harvestControl.onChange(function(value) {				
+		effectController.harvest = false;
+		harvestSmallMushrooms();		
+	})
+	
+	f1.open();
+	gui.open();
+
+}
+
+
+
+function fillScene() {
+	scene = new THREE.Scene();
+	var ambient = new THREE.AmbientLight(0x222222);	
+	
+	scene.add(ambient);
+	
+	//day lights
+	var light1 = new THREE.DirectionalLight( 0xffffff, 0.8 );
+	light1.position.set( 200, 500, 500 );
+		
+	var light2 = new THREE.DirectionalLight( 0xddffdd, 0.7 );
+	light2.position.set( -20, 0, -20 );
+
+	var spot1 = new THREE.SpotLight(0xfffff0);
+	spot1.id = "daySpot1";
+	spot1.position.set ( 400, 800, 1000);
+	spot1.castShadow = isDaytime;
+	spot1.intensity = 1;
+	spot1.shadowCameraVisible = showSpotCam && isDaytime;
+	spot1.shadowDarkness = 0.5;
+	
+	
+	var lightTarget = new THREE.Object3D();
+	lightTarget.position.set(0,0,50);	
+	//scene.add(lightTarget);
+	spot1.id = "spot1";
+	spot1.target = lightTarget;
+	
+	daylight = new THREE.Object3D();
+	daylight.add(light1);
+	daylight.add(light2);
+	daylight.add(spot1);
+	
+	daylight.traverse(function (obj) {
+		obj.visible = isDaytime;
+	});
+	
+	//night lights
+	
+	var nd1 = new THREE.DirectionalLight(0xddddff, 0.3);
+	nd1.position.set(0, 1, -1);
+		
+	var spot2 = new THREE.SpotLight(0x2222ff);
+	spot2.id = "nightSpot1";
+	spot2.position.set (200, 500, -800);
+	spot2.castShadow = !isDaytime;
+	spot2.intensity = 1;
+	spot2.shadowCameraVisible = showSpotCam && !isDaytime;
+	spot2.shadowDarkness = 0.9;
+			
+			
+	nightlight = new THREE.Object3D();
+	//nightlight.add(ambient);
+	nightlight.add(nd1);
+	nightlight.add(spot2);
+	
+	nightlight.traverse(function (obj) {
+		obj.visible = !isDaytime;
+	});
+	
+	scene.add(daylight);
+	scene.add(nightlight);
+	
+	//Coordinates.drawGrid({size: 500});
+	//Coordinates.drawAllAxes({axisLength: 100, axisRadius: 1});
+	
+	drawBackground();
+	drawMushroom();	
+	drawButterfly();
+}
+
+
+
+function addToDOM() {
+    var container = document.getElementById('container');
+    var canvas = container.getElementsByTagName('canvas');
+    if (canvas.length>0) {http://workshop.chromeexperiments.com/examples/gui/#
+        container.removeChild(canvas[0]);
+    }
+    container.appendChild( renderer.domElement );
+}
+
+
+function animate() {
+	requestAnimationFrame(animate);
+	render();
+	
+}
+
+
+
+function render() {
+    var delta = clock.getDelta();
+	
+	cameraControls.update(delta);
+	
+	var time = clock.getElapsedTime();
+	
+	effectController.camPosX = camera.position.x;
+	effectController.camPosY = camera.position.y;
+	effectController.camPosZ = camera.position.z;
+	effectController.camLookX = cameraControls.target.x;
+	effectController.camLookY = cameraControls.target.y;
+	effectController.camLookZ = cameraControls.target.z;
+	
+	TWEEN.update();
+	
+    var time = clock.getElapsedTime();
+        
+    if (animateWater) {
+		riverMat.map.offset.set( 0, time );
+		
+		var maxHeight = 30;
+		var minHeight = -5;
+		var dir = 1;
+		for (var i = (bubbleCount - 1); i >= 0; i--) {		
+		 var particle = bubblePartSys.geometry.vertices[i];		
+		
+		 var incr = Math.random() * 2;
+		 var r =  Math.random();
+		 if (r > 0.5) {
+			dir = -1;
+		 } else {
+			dir = 1;
+		 }
+		 if (particle.y > maxHeight) {
+			dir = -1;
+		 } 
+		 if (particle.y < minHeight) {
+			dir = 1;
+		 }
+		
+		  particle.y = particle.y + (incr * dir);		
+		  //console.log(i + "particle:" + particle.y);		
+		}
+		
+	}
+    
+	renderer.render(scene, camera);
+}
+
+
+
+
+
+// this is the main action sequence
+
+init();
+setupGui();
+fillScene();
+addToDOM();
+animate();
+
+
+
+</script>
+
+
+
+
+</body>
+</html>
