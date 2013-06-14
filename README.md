@@ -24,7 +24,7 @@ butterfly.js example use:
 
 
 
-To run Mushroom.html you will also need some other files not included in this repository: 
+To run Mushroom.html you will also need: 
 <ul>
 <li>web browser that supports WebGL (http://get.webgl.org/)</li>
 <li>three.js  (get from https://github.com/mrdoob/three.js or http://threejs.org/) </li>
