@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+
+<head>
+
+<title>bfly</title>
+
+
+<script src="./../mrdoob-threejs/build/three.min.js"></script>
+<script src="./../cs291-master/lib/Coordinates.js"></script>
+<script src="./../cs291-master/lib/OrbitAndPanControls.new.js"></script>
+<script src="./../cs291-master/lib/dat.gui.min.js"></script>
+<script src="./../tween.js-master/build/tween.min.js"></script>
+<script src="./js/butterfly.js"></script>
+<script src="./js/tubeTry.js"></script>
+
+</head>
+<body>
+<div id="container">
+<canvas>
+</canvas>
+</div>
+
+<script type="text/javascript">
+/*global THREE, Coordinates, document, window, dat*/
+
+var camera, scene, renderer;
+var cameraControls, effectController;
+var clock = new THREE.Clock();
+var axes = true;
+var ground = true;
+var rSeg = 32;
+var hSeg = 16;
+
+var isWire = false;
+var isDaytime = true;
+var animateButterfly = false;
+
+
+var bodyColor = 0xdddd00;
+var headColor = 0xdddd00;
+var catObj;
+var bfly1;
+
+var moon;
+var flyTween;
+
+function drawSkyObjects() {
+	var moonTexture = THREE.ImageUtils.loadTexture("./img/bubble2.png");
+	var moonGeo = new THREE.SphereGeometry(50, rSeg, rSeg);
+	var moonMat = new THREE.MeshLambertMaterial({color: 0x5577ff, transparent: true});
+	
+	moon = new THREE.Mesh(moonGeo, moonMat);
+	moon.position.set (100, 0, -500);
+	
+	if (isDaytime) {
+		moon.material.opacity = 0.0;
+	}
+	
+	scene.add(moon);
+	
+}
+
+
+
+
+function drawButterfly() {	
+	
+	bfly1 = new Butterfly("0x00dd55", "0xffff00", "./img/wing.png");	
+	bfly1.createButterfly();	
+	bfly1.model.scale.set(2,2,2);
+	bfly1.model.rotation.x = 40 * Math.PI / 180;	
+	bfly1.model.position.set (-30, 50, -50);
+	
+	scene.add(bfly1.model);	
+	
+	
+}
+
+function drawCat() {
+	catObj = new THREE.Object3D();
+	
+	var headMat = new THREE.MeshLambertMaterial({color: headColor, wireframe: isWire});		
+	var bodyMat = new THREE.MeshLambertMaterial({color: bodyColor, wireframe: isWire});
+		
+	var headGeo = new THREE.SphereGeometry(16, rSeg, hSeg);	
+	var bodyGeo = new THREE.SphereGeometry(20, rSeg, hSeg);
+	
+		
+	var head = new THREE.Mesh(headGeo, headMat);
+	var body = new THREE.Mesh(bodyGeo, bodyMat);
+	
+	head.id = "head";
+	body.id = "body";
+	
+	head.position.y = 15;
+	head.position.z = 30;
+	body.scale.z = 1.5;
+	
+	
+	catObj.add(head);
+	catObj.add(body);
+	
+	
+	scene.add(catObj);
+
+}
+
+
+function fillScene() {
+	scene = new THREE.Scene();
+	scene.add( new THREE.AmbientLight( 0x333333) );
+
+	var light1 = new THREE.DirectionalLight( 0xffffff, 0.9 );
+	light1.position.set( 200, 500, 500 );
+
+	
+	var light2 = new THREE.DirectionalLight( 0xdddddd, 0.7 );
+	light2.position.set( -200, -100, -400 );
+
+	scene.add(light1);
+	scene.add(light2);
+	
+	Coordinates.drawGrid({size: 500});
+	//Coordinates.drawAllAxes({axisLength: 100, axisRadius: 1});
+	
+	//drawCat();
+	drawButterfly();
+	drawSkyObjects();
+	
+}
+
+
+function init() {
+	var canvasWidth = 846; 
+	var canvasHeight = 494;
+	var canvasRatio = canvasWidth / canvasHeight;
+
+	// RENDERER
+	renderer = new THREE.WebGLRenderer( { antialias: false } );
+	renderer.gammaInput = true;
+	renderer.gammaOutput = true;
+	renderer.setSize(canvasWidth, canvasHeight);
+	renderer.setClearColor(0xdddddd, 1.0 );
+
+	// CAMERA
+	camera = new THREE.PerspectiveCamera( 38, canvasRatio, 1, 10000 );
+	
+	// CONTROLS
+	cameraControls = new THREE.OrbitAndPanControls(camera, renderer.domElement);
+	camera.position.set(-54, 100, 171);
+	cameraControls.target.set(-22,27,-19);
+
+}
+
+function setupGui() {
+	effectController = {		
+		bodyColor: bodyColor,
+		headColor: headColor,
+		animateBfly: animateButterfly,	
+		isDaytime: isDaytime,
+		
+		camPosX: camera.position.x,
+		camPosY: camera.position.y,
+		camPosZ: camera.position.z,
+		camLookX: cameraControls.target.x,
+		camLookY: cameraControls.target.y,
+		camLookZ: cameraControls.target.z
+
+	}
+	 
+	var gui = new dat.GUI();
+	var f1 = gui.addFolder("Display");
+	var f2 = gui.addFolder("Camera Info:");
+	
+	
+	//f1.addColor(effectController, 'bodyColor').name("body color");
+	//f1.addColor(effectController, 'headColor').name("head color");
+	 
+	var bflyControl = f1.add(effectController, "animateBfly").name("animate butterfly").listen();
+	var timeControl = f1.add(effectController, "isDaytime").name("Daytime?").listen();
+		
+	
+	f2.add(effectController, 'camPosX').listen();
+	f2.add(effectController, 'camPosY').listen();
+	f2.add(effectController, 'camPosZ').listen();
+	f2.add(effectController, 'camLookX').listen();
+	f2.add(effectController, 'camLookY').listen();
+	f2.add(effectController, 'camLookZ').listen();
+		
+	
+	bflyControl.onChange(function(value) {  
+		animateButterfly = effectController.animateBfly;		
+	
+
+		if (animateButterfly) {
+			bfly1.flapWings();
+			//bfly1.flyTo(10,10,100, 1000);
+			//bfly1.hover(500);
+		} else {
+			bfly1.restWings();
+			
+		}	 
+		
+	});
+	 
+	timeControl.onChange(function(value) {
+		isDaytime =  effectController.isDaytime;
+		
+		if (!isDaytime) {
+			//animate the moon opacity to be visible or scale to 0
+			//move the mooon up to the sky
+			moon.material.opacity = 1.0;			
+		
+			var opacity = {val: 0.0};
+			var opacityTarget = {val: 1.0};
+			var tween0 = new TWEEN.Tween(opacity).to(opacityTarget, 1000);
+			tween0.easing(TWEEN.Easing.Cubic.In);
+			tween0.onUpdate(function() {
+				moon.material.opacity = opacity.val;
+			});
+			
+		
+			var position = { x : 100, y: 0};
+			var target = { x : 100, y: 300};
+						
+			var tween1 = new TWEEN.Tween(position).to(target, 2000);
+			tween1.easing(TWEEN.Easing.Elastic.In);
+			tween1.onUpdate(function(){
+				moon.position.x = position.x;
+				moon.position.y = position.y;
+			});
+			
+			tween0.chain(tween1);
+			tween0.start();
+			//tween1.start();
+			
+		} else {
+			//animate the moon opacity to be invisible scale to 0
+			//remove the moon from the sky
+			var curr = {scale: 1.0, opacity: 1.0};
+			var end = {scale: 0.1, opacity: 0.0};
+			var tween0 = new TWEEN.Tween(curr).to(end, 1000);
+			tween0.easing(TWEEN.Easing.Quartic.In);
+			tween0.onUpdate(function() {
+				//moon.scale.x = curr.scale;
+				//moon.scale.y = curr.scale;
+				//moon.scale.z = curr.scale;
+				moon.material.opacity = curr.opacity;
+			});
+			
+			
+			tween0.start();
+		}
+	});
+	
+	 gui.open();
+	 f1.open();
+}
+
+
+function addToDOM() {
+    var container = document.getElementById('container');
+    var canvas = container.getElementsByTagName('canvas');
+    if (canvas.length>0) {http://workshop.chromeexperiments.com/examples/gui/#
+        container.removeChild(canvas[0]);
+    }
+    container.appendChild( renderer.domElement );
+}
+
+
+function animate() {
+	requestAnimationFrame(animate);
+	render();
+	
+}
+
+
+
+function render() {
+    var delta = clock.getDelta();
+	cameraControls.update(delta);
+	 
+	effectController.camPosX = camera.position.x;
+	effectController.camPosY = camera.position.y;
+	effectController.camPosZ = camera.position.z;
+	effectController.camLookX = cameraControls.target.x;
+	effectController.camLookY = cameraControls.target.y;
+	effectController.camLookZ = cameraControls.target.z;
+	 
+	
+	TWEEN.update();
+	
+	var time = clock.getElapsedTime();
+        
+    		
+	
+	
+	
+		
+	renderer.render(scene, camera);
+}
+
+
+
+
+
+// this is the main action sequence
+init();
+setupGui();
+fillScene();
+addToDOM();
+animate();
+
+
+</script>
+
+
+
+
+</body>
+</html>
