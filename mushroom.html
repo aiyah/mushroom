@@ -705,7 +705,7 @@ function fillScene() {
 	var sunlight = new THREE.SpotLight(0xfffff0);
 	sunlight.position.set ( 400, 800, 1000);
 	sunlight.castShadow = isDaytime;
-	sunlight.intensity = 0.1;
+	sunlight.intensity = 1.0;
 	sunlight.shadowCameraVisible = showSpotCam && isDaytime;
 	sunlight.shadowDarkness = 0.5;
 	
@@ -731,7 +731,6 @@ function fillScene() {
 	moonlight.position.set (200, 500, -800);
 	moonlight.castShadow = !isDaytime;
 	moonlight.intensity = 1.0;
-	moonlight.exponent = 0.0;
 	moonlight.shadowCameraVisible = showSpotCam && !isDaytime;
 	moonlight.shadowDarkness = 0.9;
 			
@@ -839,7 +838,9 @@ animate();
 </script>
 
 <div id="licenseStuff">
-<a rel="license" href="http://creativecommons.org/licenses/by-nc-sa/3.0/deed.en_US"><img alt="Creative Commons License" style="border-width:0" src="http://i.creativecommons.org/l/by-nc-sa/3.0/88x31.png" /></a>
+<a rel="license" href="http://creativecommons.org/licenses/by-nc-sa/3.0/deed.en_US">
+<img alt="Creative Commons License" style="border-width:0" 
+src="./img/cclicense.png" /></a>
 <br />This work by <span xmlns:cc="http://creativecommons.org/ns#" property="cc:attributionName">nm</span> is licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-nc-sa/3.0/deed.en_US">Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License</a>.
 <br />Based on a work at <a xmlns:dct="http://purl.org/dc/terms/" href="https://github.com/aiyah/mushroom" rel="dct:source">https://github.com/aiyah/mushroom</a>.
 </div>
