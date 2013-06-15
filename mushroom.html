@@ -16,17 +16,22 @@
 
 
 <style type="text/css">
-	.c1 {
-		width: 800px;
-		height: 600px;
-	}
-	
 	
 	#container{
-		width: 810px;
-		height: 610px;
+		width: 640px;
+		height: 480px;
 		border: 1px solid #000;
 	}
+	
+
+	#licenseStuff {
+		padding-top: 5px;
+		margin-top: 10px;
+		border-top: 1px solid #999;
+		font-family: arial, helvetica, sans-serif;
+		font-size: 10px;
+	}
+	
 </style>
 
 </head>
@@ -34,7 +39,7 @@
 
 
 <div id="container">
-<canvas class="c1">
+<canvas>
 </canvas>
 </div>
 
@@ -45,33 +50,31 @@ var camera, scene, renderer, projector;
 var cameraControls, effectController;
 
 var clock = new THREE.Clock();
+var canvasWidth =  640;
+var canvasHeight = 480;
+
 var rSeg = 32;
 var hSeg = 8;
 
-var showSpotCam = false;	
+var showSpotCam = false;			
 var isDaytime = true;
 var animateWater = true;
 var closeView = false;
 
 var bubbleCount = 50;
-var bubblePartSys;
-var bubbleTextureDay, bubbleTextureNight;
+var bubblePartSys;							
+var bubbleTextureDay, bubbleTextureNight;	//so can switch for night and day
 
-var canvasWidth =  800;
-var canvasHeight = 600;
 var objects = [];			//list of mesh  in the scene that check for onmousedown
 
-
-var daylight, nightlight;
+var daylight, nightlight;	//arrays to hold lights for day and nights 
 var riverMat;				//made global so can access for animation in render func
 
-var wireMaterial = new THREE.MeshBasicMaterial({color: 0x009900, wireframe: true, transparent: true});
-
-var wireObjs = [];
 var mushroomList = [];		//list of Mushroom objects (mushroom.js)
-var smallMushrooms = [];
+var smallMushrooms = [];	//list of generated mushrooms
 
 var moon;
+var moonlight;
 var bfly1;
 
 function drawSkyObjects() {
@@ -79,8 +82,7 @@ function drawSkyObjects() {
 	var moonMat = new THREE.MeshBasicMaterial({color: 0x5577ff, transparent:true});
 	
 	moon = new THREE.Mesh(moonGeo, moonMat);
-	//moon.position.set (100, 500, -500);
-	moon.position.set(200, 500, -700)
+	moon.position.set (100, 500, -500);
 	
 	if (isDaytime) {
 		moon.position.set (100, 0, -500);
@@ -88,7 +90,6 @@ function drawSkyObjects() {
 	}
 	
 	scene.add(moon);
-	
 	
 }
 
@@ -224,7 +225,6 @@ function drawBackground() {
 	ground.receiveShadow = true;
 		
 	scene.add(ground);
-	
 
 	drawWaterFall();
 	drawSkyObjects();
@@ -321,6 +321,8 @@ function drawButterfly() {
 
 	bfly1 = new Butterfly("0x00dd55", "0xffff00", "./img/wing.png");	
 	bfly1.createButterfly();	
+	bfly1.setCastShadows(true);
+
 	bfly1.model.scale.set(3,3,3);
 	bfly1.model.rotation.x = 40 * Math.PI / 180;	
 	bfly1.model.position.set (-210, 120, -10);
@@ -440,7 +442,6 @@ function mushroomAction2() {
 	var origPos = new THREE.Vector3();
 	var origLook = new THREE.Vector3();
 	
-	
 	origPos.copy(camera.position);
 	origLook.copy(cameraControls.target);
 	
@@ -451,7 +452,7 @@ function mushroomAction2() {
 
 	var endPos1;
 	if (closeView) {
-		endPos1 = {x1: -110, y1:147, z1:485, x2:-7, y2:90, z2: 67}
+		endPos1 = {x1: -32, y1:79, z1:500, x2:-7, y2:90, z2: 67}
 	} else {
 		endPos1 = {x1: -290, y1:570, z1:1400, x2:60, y2:195, z2: -47}
 	}
@@ -540,6 +541,8 @@ function updateTimeOfDay() {
 		}
 	});	
 	
+	//possible to animate the renderer.clearColor?
+	
 	if (isDaytime) {
 		renderer.setClearColor( 0xDDEEFF, 1.0 );
 		bubblePartSys.material.map = bubbleTextureDay;				
@@ -572,6 +575,8 @@ function displayMoon() {
 	//animate the moon opacity to be visible 
 	//move the mooon up to the sky
 	moon.position.set (100, 0, -500);
+	moonlight.position.set (200, 0, -800);
+	moonlight.intensity = 0.0
 		
 	var opacity = {val: 0.0};
 	var opacityTarget = {val: 1.0};
@@ -579,6 +584,7 @@ function displayMoon() {
 	tween0.easing(TWEEN.Easing.Cubic.In);
 	tween0.onUpdate(function() {
 		moon.material.opacity = opacity.val;
+		moonlight.intensity = opacity.val;
 	});
 			
 	var position = { x : 100, y: 0};
@@ -589,6 +595,9 @@ function displayMoon() {
 	tween1.onUpdate(function(){
 		moon.position.x = position.x;
 		moon.position.y = position.y;
+		
+		moonlight.position.y = position.y;
+		
 	});
 			
 	tween0.delay(500);
@@ -702,8 +711,7 @@ function setupGui() {
 
 function fillScene() {
 	scene = new THREE.Scene();
-	var ambient = new THREE.AmbientLight(0x222222);	
-	
+	var ambient = new THREE.AmbientLight(0x111111);	
 	scene.add(ambient);
 	
 	//day lights
@@ -713,48 +721,42 @@ function fillScene() {
 	var light2 = new THREE.DirectionalLight( 0xddffdd, 0.7 );
 	light2.position.set( -20, 0, -20 );
 
-	var spot1 = new THREE.SpotLight(0xfffff0);
-	spot1.id = "daySpot1";
-	spot1.position.set ( 400, 800, 1000);
-	spot1.castShadow = isDaytime;
-	spot1.intensity = 1;
-	spot1.shadowCameraVisible = showSpotCam && isDaytime;
-	spot1.shadowDarkness = 0.5;
-	
+	var sunlight = new THREE.SpotLight(0xfffff0);
+	sunlight.position.set ( 400, 800, 1000);
+	sunlight.castShadow = isDaytime;
+	sunlight.intensity = 0.1;
+	sunlight.shadowCameraVisible = showSpotCam && isDaytime;
+	sunlight.shadowDarkness = 0.5;
 	
 	var lightTarget = new THREE.Object3D();
 	lightTarget.position.set(0,0,50);	
 	//scene.add(lightTarget);
-	spot1.id = "spot1";
-	spot1.target = lightTarget;
+	sunlight.target = lightTarget;
 	
 	daylight = new THREE.Object3D();
 	daylight.add(light1);
 	daylight.add(light2);
-	daylight.add(spot1);
+	daylight.add(sunlight);
 	
 	daylight.traverse(function (obj) {
 		obj.visible = isDaytime;
 	});
 	
 	//night lights
-	
 	var nd1 = new THREE.DirectionalLight(0xddddff, 0.3);
 	nd1.position.set(0, 1, -1);
 		
-	var spot2 = new THREE.SpotLight(0x2222ff);
-	spot2.id = "nightSpot1";
-	spot2.position.set (200, 500, -800);
-	spot2.castShadow = !isDaytime;
-	spot2.intensity = 1;
-	spot2.shadowCameraVisible = showSpotCam && !isDaytime;
-	spot2.shadowDarkness = 0.9;
-			
+	moonlight = new THREE.SpotLight(0x2525ff);
+	moonlight.position.set (200, 500, -800);
+	moonlight.castShadow = !isDaytime;
+	moonlight.intensity = 1.0;
+	moonlight.exponent = 0.0;
+	moonlight.shadowCameraVisible = showSpotCam && !isDaytime;
+	moonlight.shadowDarkness = 0.9;
 			
 	nightlight = new THREE.Object3D();
-	//nightlight.add(ambient);
 	nightlight.add(nd1);
-	nightlight.add(spot2);
+	nightlight.add(moonlight);
 	
 	nightlight.traverse(function (obj) {
 		obj.visible = !isDaytime;
@@ -853,10 +855,13 @@ fillScene();
 addToDOM();
 animate();
 
-
-
 </script>
 
+<div id="licenseStuff">
+<a rel="license" href="http://creativecommons.org/licenses/by-nc-sa/3.0/deed.en_US"><img alt="Creative Commons License" style="border-width:0" src="http://i.creativecommons.org/l/by-nc-sa/3.0/88x31.png" /></a>
+<br />This work by <span xmlns:cc="http://creativecommons.org/ns#" property="cc:attributionName">nm</span> is licensed under a <a rel="license" href="http://creativecommons.org/licenses/by-nc-sa/3.0/deed.en_US">Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License</a>.
+<br />Based on a work at <a xmlns:dct="http://purl.org/dc/terms/" href="https://github.com/aiyah/mushroom" rel="dct:source">https://github.com/aiyah/mushroom</a>.
+</div>
 
 
 
