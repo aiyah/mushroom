@@ -1,5 +1,17 @@
+//mushroom.js - javascript to create a mushroom object 
+//uses three.js to create the 3d model (http://threejs.org/)
+//uses tween.js to perform animations (https://github.com/sole/tween.js/)
 
 
+//example use:
+/*
+	var m1 = new Mushroom();
+	m1.growIt();
+	scene.add(m1.model);
+*/
+
+//set optional initial values
+//capOffsetY - difference in bottom cap edge and top edge of the stalk
 function Mushroom (capSize, stalkHeight, stalkTop, stalkBottom, capScaleY, capOffsetY) {
 
 	this.capColor = "0xffffff";
@@ -10,8 +22,8 @@ function Mushroom (capSize, stalkHeight, stalkTop, stalkBottom, capScaleY, capOf
 	this.underCapTexture = null;
 	this.stalkTexture = null;
 	
-	this.rSeg = 16;
-	this.hSeg = 2;
+	this.rSeg = 16;					//radius segments
+	this.hSeg = 2;					//height segments
 			
 	this.capSize = (capSize === undefined) ? 30 : capSize; 
 	this.stalkHeight = (stalkHeight === undefined) ? 30 : stalkHeight;
@@ -23,28 +35,35 @@ function Mushroom (capSize, stalkHeight, stalkTop, stalkBottom, capScaleY, capOf
 	this.model = null;			//Object3D
 }
 
+//for debug
+/*
 Mushroom.prototype.displayValues = function() {
 	console.log("--------------------------------");
 	console.log("capSize:" + this.capSize);	
 	console.log("stalkHeight:" + this.stalkHeight);
 	console.log("capScaleY:" + this.capScaleY);
 }
+*/
 
+//call setTextures before growIt() to set colors
+// pass in colors as hex string
 Mushroom.prototype.setColors = function(c1, c2, c3) {
 	this.capColor = c1;
 	this.underCapColor = c2;
 	this.stalkColor = c3;
 }
 
-Mushroom.prototype.setTextures = function(c1, c2, c3) {
-	this.capTexture = c1;
-	this.underCapTexture = c2;
-	this.stalkTexture = c3;
+//call setTextures before growIt to set material textures
+//pass in texture file location as string
+Mushroom.prototype.setTextures = function(t1, t2, t3) {
+	this.capTexture = t1;
+	this.underCapTexture = t2;
+	this.stalkTexture = t3;
 }
 
-Mushroom.prototype.growIt = function() {
-	//this.displayValues();
-	
+//Sets up the geometry and apply materials to mesh.  
+//Creates the THREE.Object3D to store in the model property
+Mushroom.prototype.growIt = function() {	
 	var capGeo = new THREE.SphereGeometry(this.capSize, rSeg, hSeg, 0, Math.PI * 2, 0, Math.PI / 2 );
 	var underCapGeo = new THREE.Geometry();
 	var stalkGeo = new THREE.CylinderGeometry (this.stalkTop, this.stalkBottom, this.stalkHeight, rSeg, 4, false);	
@@ -92,7 +111,7 @@ Mushroom.prototype.growIt = function() {
 	
 		geo.faces.push(new THREE.Face4(0,1,2,3));		
 		
-		
+		//need to do assign uvs to vertices so can apply texture to undercap
 		uvs.push(new THREE.Vector2(0.0, 0.0));
 		uvs.push(new THREE.Vector2(1.0, 0.0));
 		uvs.push(new THREE.Vector2(1.0, 1.0));
@@ -123,7 +142,7 @@ Mushroom.prototype.growIt = function() {
 	return mushroomObj;
 }
 
-
+//animate the mushroom to jump up
 Mushroom.prototype.jiggle = function(jumpHeight) {
 
 	var shroom = this.model;
@@ -131,15 +150,12 @@ Mushroom.prototype.jiggle = function(jumpHeight) {
 	var origPos = new THREE.Vector3();
 	origPos.copy(this.model.position);
 	
-	//console.log("jiggle y:" + origPos.y);
-	
 	if (jumpHeight === undefined) {
 		jumpHeight = 30;	
 	}	
 	
 	var origY = this.stalkHeight / 2 ;
 	
-	//var startPos1= {rZ: 0, pY: origPos.y};
 	var startPos1= {rZ: 0, pY: origY};
 	var endPos1 = {rZ: 20, pY: origPos.y + jumpHeight};
 	var startPos2= {rZ: 20, pY: origPos.y + jumpHeight};
@@ -178,10 +194,10 @@ Mushroom.prototype.jiggle = function(jumpHeight) {
 }
 
 
+//animate the mushroom to act like a push button
+//dHeight - down amount, optional
 Mushroom.prototype.pushButton = function(dHeight) {
 	var shroom = this.model;
-	
-	//console.log("pushButton");
 	
 	var origPos = new THREE.Vector3();
 	origPos.copy(this.model.position);
@@ -213,7 +229,7 @@ Mushroom.prototype.pushButton = function(dHeight) {
 }
 
 
-
+//animate the mushroom to spin 360 degrees
 Mushroom.prototype.spin = function() {
 	var shroom = this.model;
 
