@@ -263,13 +263,8 @@ function drawMushroom () {
 	m2.model.children[0].id = "cap2";
 	m2.model.children[1].id = "ucap2";	
 	m2.model.children[2].id = "stalk2";	
-	//m2.model.children[2].material.color.setHex("0x75d6fb");
-	//var capTexture1 = THREE.ImageUtils.loadTexture( './img/stalk2.png' );		
-	//m2.model.children[2].material.map = capTexture1;	
 	m2.model.children[2].material.map.wrapT = THREE.RepeatWrapping;
 	m2.model.children[2].material.map.repeat.set(1, 4);
-	//m2.model.rotation.z = 15 * Math.PI / 180;
-		
 	
 	m3.model.children[0].id = "cap3";
 	m3.model.children[1].id = "ucap3";	
@@ -289,24 +284,19 @@ function drawMushroom () {
 	
 	scene.add(shroomGroup);
 	
-	//push onto array so can detect intersect when click (cap, undercap, stalk)
-	objects.push(m1.model.children[0]);	//cap
-	objects.push(m2.model.children[0]);	//undercap
-	objects.push(m3.model.children[0]);	//stalk
-	
-	objects.push(m1.model.children[1]);
-	objects.push(m2.model.children[1]);
-	objects.push(m3.model.children[1]);
-	
-	objects.push(m1.model.children[2]);
-	objects.push(m2.model.children[2]);
-	objects.push(m3.model.children[2]);
+	//push (cap, undercap, stalk) onto object array so can detect intersect when click 
+	for (var i = 0; i < 3; i++) {
+		objects.push(m1.model.children[i]);	
+		objects.push(m2.model.children[i]);	
+		objects.push(m3.model.children[i]);	
+	}
 		
 	mushroomList.push(m1);
 	mushroomList.push(m2);
 	mushroomList.push(m3);
 	
 	for (var i = 0; i < 3; i++) {
+		//use traverse code snippet from udacity cs291 
 		mushroomList[i].model.traverse(function (object) {
 			if (object instanceof THREE.Mesh) {
 				object.castShadow = true;
@@ -402,7 +392,6 @@ function onDocumentMouseDown( event ) {
 		}
 		
 	
-	
 		/*var sphereGeom = new THREE.SphereGeometry(10);
 		var sphereMaterial = new THREE.MeshBasicMaterial({color: 0xdddddd});
 		
@@ -431,26 +420,24 @@ function mushroomAction1() {
 	effectController.isDaytime = isDaytime;		
 }
 
+//change camera view, toggle between close and far
 function mushroomAction2() {
 	var shroom = mushroomList[1];
 	shroom.pushButton();
 	
 	closeView = !closeView;
 	
-	
-	//do a camera rotation
 	var origPos = new THREE.Vector3();
 	var origLook = new THREE.Vector3();
 	
 	origPos.copy(camera.position);
 	origLook.copy(cameraControls.target);
 	
-	//console.log("origPos: " + origPos.x +  ", "  + origPos.y + "," + origPos.z);
-	
 	var startPos1 = {x1: origPos.x, y1: origPos.y, z1:origPos.z,
 		x2: origLook.x, y2: origLook.y, z2: origLook.z};
 
 	var endPos1;
+	
 	if (closeView) {
 		endPos1 = {x1: -32, y1:79, z1:500, x2:-7, y2:90, z2: 67}
 	} else {
@@ -471,22 +458,19 @@ function mushroomAction2() {
 	
 	tween0.delay(500);
 	tween0.start();
-
-		
-	//console.log("newPos: " + camera.position.x +  ", "  + camera.position.y + "," + camera.position.z);
-	
 }
 
+
+//create baby mushrooms
 function mushroomAction3() {
 	var shroom = mushroomList[2];
 	shroom.jiggle();
 	
-	//add new mushrooms
 	var capSize = 10 + (Math.random() * 10);
 	var stalkHeight = 10 + (Math.random() * 5);
 	var stalkTop = capSize - 5 - (Math.random() * 5);
 	var stalkBottom = stalkTop + (Math.random() * 5);
-	var capScaleY = Math.random() * 2 + 1;
+	var capScaleY = Math.random() * 2 + 0.5;
 	
 	var m = new Mushroom (capSize, stalkHeight, stalkTop, stalkBottom, capScaleY);
 	
@@ -517,15 +501,13 @@ function mushroomAction3() {
 	//console.log("baby mushroom is born! at:" +  xpos + ", " + ypos + "," + zpos)
 	
 	smallMushrooms.push(m);
-	
 	scene.add(m.model);
-		
 }
 
 
 
 function updateTimeOfDay() {
-	//change the lighting
+	//change the lighting to turn off/on lights and cast/uncast shadows
 		
 	daylight.traverse(function (obj) {
 		obj.visible = isDaytime;
@@ -542,7 +524,6 @@ function updateTimeOfDay() {
 	});	
 	
 	//possible to animate the renderer.clearColor?
-	
 	if (isDaytime) {
 		renderer.setClearColor( 0xDDEEFF, 1.0 );
 		bubblePartSys.material.map = bubbleTextureDay;				
@@ -711,7 +692,7 @@ function setupGui() {
 
 function fillScene() {
 	scene = new THREE.Scene();
-	var ambient = new THREE.AmbientLight(0x111111);	
+	var ambient = new THREE.AmbientLight(0x222222);	
 	scene.add(ambient);
 	
 	//day lights
